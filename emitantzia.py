@@ -3,7 +3,7 @@
 
 # # Emittance Calculation
 
-# In[121]:
+# In[1016]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -13,17 +13,24 @@ import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 import ipywidgets
 from scipy.fft import fft, fftfreq
+from scipy.signal import argrelextrema
+
+
+# In[ ]:
+
+
+
 
 
 # ## Import csv with the positions intensities and other useful data to calculate the emittance
 
-# In[122]:
+# In[1017]:
 
 
 df = pd.read_csv("Results/Results_final.csv")
 
 
-# In[123]:
+# In[1018]:
 
 
 df
@@ -33,7 +40,7 @@ df
 # Taking into account that the *beam is diverging* we will suppose the the least deviation from the others means that is the center. 
 # For each point we save the sumation of the 4 minimum distances from all the other points. We will consider that the center will be the spot whose sumation is the minimum. It must fulfill also that is inside a (Ax, Ay) bounds from the pyhiscal center.
 
-# In[124]:
+# In[1019]:
 
 
 # Define the (Ax, Ay) bounds (mm)
@@ -41,7 +48,7 @@ Ax = 1
 Ay = 1
 
 
-# In[125]:
+# In[1020]:
 
 
 # Get the X and Y arrays
@@ -49,7 +56,7 @@ x = df['X'].to_numpy()
 y = df['Y'].to_numpy()
 
 
-# In[126]:
+# In[1021]:
 
 
 # Calculate the center
@@ -57,7 +64,7 @@ cx = (np.max(x) + np.min(x))/2
 cy = (np.max(y) + np.min(y))/2
 
 
-# In[127]:
+# In[1022]:
 
 
 # Get the 4 minimum distances and then the addition of them for each point
@@ -92,7 +99,7 @@ print("Center index: ", centerindex)
 print("Center index indices: ", mindistsindex[centerindex])
 
 
-# In[128]:
+# In[1023]:
 
 
 # Remove the minima that is not inside the (Ax, Ay) boundaries
@@ -106,7 +113,7 @@ print("Center distance from pyhisical center: ",
 print("Center index neighbour indices: ", mindistsindex[centerindex])
 
 
-# In[129]:
+# In[1024]:
 
 
 # Translate all points to the calculated center 
@@ -114,7 +121,7 @@ x = x - x[centerindex]
 y = y - y[centerindex]
 
 
-# In[130]:
+# In[1025]:
 
 
 # Draw the points and highlight the center.
@@ -130,13 +137,13 @@ plt.rcParams['figure.figsize'] = [9.5, 6.0]
 #plt.figure(figsize=(32, 24), dpi=300)
 
 
-# In[131]:
+# In[1026]:
 
 
 #Generates a radial mesh with variable distance between consecutive rings
 def RadialMeshGenerator(pointDis,MeshSize,ratio):
      # number of bins in r and theta dimensions
-    N_bins_theta = round(MeshSize/(np.sqrt(2**3)*pointDis))
+    N_bins_theta = round(MeshSize/(np.sqrt(2**3)*pointDis))*3
     N_bins_r = round(MeshSize/(np.sqrt(2**3)*pointDis))
 
     # limits in r dimension
@@ -178,7 +185,7 @@ def MeshGenerator(pointDis,MeshSize):
 # ## Create a master (regular) mesh taking the  calculated center. We suppose grid is symmetric in both x and y axes. 
 # We also scale the image so the distance between the points near the calculated center (Amesh) is the same that the distance between the points of the Pepperpot grid (Aactualmesh).
 
-# In[143]:
+# In[1027]:
 
 
 
@@ -207,16 +214,37 @@ if np.mod(ny,2) == 0:
 # Add extra points
 nx = nx + extraMesh
 ny = ny + extraMesh
+#Square mesh with measurements
 fig, ax = plt.subplots()
 ax.scatter(xs,ys,color="#FF0066")
 xm,ym=MeshGenerator(Aactualmesh,35)
 ax.scatter(xm,ym)
 
-r0,theta0=RadialMeshGenerator(Aactualmesh,35,0)
-print(theta0)
+
+# In[1028]:
+
+
+#radial equidistant mesh with diverging mesh
+theta0,r0=RadialMeshGenerator(Aactualmesh,35,0)
+theta05,r05=RadialMeshGenerator(Aactualmesh,35,0.5)
 ax1=plt.subplot(111,projection="polar")
-ax1.set_title("Equidistant radial mesh")
-ax1.scatter(r0,theta0)
+ax1.set_title(" radial mesh")
+ax1.scatter(theta0,r0,color="blue")
+ax2=plt.subplot(111,projection="polar")
+ax2.scatter(theta05,r05,color="red")
+#Extract one meridian from equidistant and diverging meshes
+rex0=np.zeros(len(r0))
+rex05=np.zeros(len(r05))
+for i in range(len(r0)):
+    rex0[i]=r0[i][0]
+for i in range(len(r05)):
+    rex05[i]=r05[i][0]
+
+
+# In[ ]:
+
+
+
 
 
 # ## Emittance Calculation
@@ -230,7 +258,7 @@ ax1.scatter(r0,theta0)
 # 
 # $<xx'>=\frac{1}{N}\sum \limits _{i=1} ^{N} (x_{i}-\overline {x})(x'_{i}-\overline {x'})$ 
 
-# In[133]:
+# In[1029]:
 
 
 # Define the distance from the mesh and the image. This value is set by 
@@ -250,7 +278,28 @@ for i in range(len(xs)):
             mindist = distcalc
     meshrelation[i] = mindistindex
 #print(meshrelation)
-
+#Find equidistant and diverging mesh matching points
+rmatch=[]
+matchin=[]
+for i in range(len(rex05)):
+    for j in range(len(rex0)):
+        if(np.abs(rex0[j]-rex05[i])<Aactualmesh*np.sqrt(2)):
+            rmatch.append(rex0[j])
+            matchin.append(j)
+rmatch=np.array(rmatch)
+#Plot radial mesh with matching points highlighted
+""""shape=(len(rmatch),len(theta0))
+matchplot=np.zeros(shape)
+thetaplot=np.zeros(shape)
+rtheta=np.linspace(0,2*np.pi,len(rmatch))
+for i in range(len(rmatch)):
+    for j in range(len(theta0)):
+        matchplot[i][j]=rmatch[i]
+        thetaplot[i][j]=rtheta[j]
+ax4=plt.subplot(111,projection="polar")
+ax4.scatter(theta0,r0,label="equidistant")
+ax4.scatter(theta05,r05,color="red",label="diverging")
+ax4.scatter(thetaplot,matchplot,color="green",label="matching")"""
 # Draw the points and highlight the center.
 fig, ax = plt.subplots()
 plt.rc('font', size=30) #controls default text size
@@ -300,6 +349,7 @@ for inds in meshrelation:
     ysp[i] = (ys[int(inds[0])] - ym[int(inds[1])])/L
     i = i + 1
 
+
 xsmean = np.mean(xs) # \overline{x}
 xspmean = np.mean(xsp) # \overline{x'}
 xs2 = np.mean((xs-xsmean)**2) # <x^{2}>
@@ -316,6 +366,7 @@ eyrms = np.sqrt(ys2*ysp2-ysysp**2)
 
 print ("Emittance x rms (mmmrad): ", exrms)
 print ("Emittance y rms (mmmrad): ", eyrms)
+
 print ("Emittance x rms (pimmmrad): ", exrms/np.pi)
 print ("Emittance y rms (pimmmrad): ", eyrms/np.pi)
 
@@ -393,18 +444,18 @@ plot2.set_title("Fast Fourier Transfor of x'")
 plot2.scatter(xpfrek,2/len(xsp)*np.abs(xpf))
 plt.savefig("Fourierrak/xpf_7k.png")
 
-"""fig3, plot3=plt.subplots()
+fig3, plot3=plt.subplots()
 plot3.set_xlabel("angle(rad)")
 plot3.set_ylabel("fft(y)(2π/mm)")
 plot3.set_title("Fast Fourier Transform of y")
-plot3.scatter(yfrek,2/len(ys)*np.abs(yf))
-plt.savefig("Fourierrak/yf_7k.png")"""
+#plot3.scatter(yfrek,2/len(ys)*np.abs(yf))
+plt.savefig("Fourierrak/yf_7k.png")
 
 fig4, plot4=plt.subplots()
 plot4.set_xlabel("angle(rad)")
 plot4.set_ylabel("fft(y')(2π/mm)")
 plot4.set_title("Fast Fourier Transform of y'")
-plot4.scatter(ypfrek,2/len(ysp)*np.abs(ypf))
+#plot4.scatter(ypfrek,2/len(ysp)*np.abs(ypf))
 plt.savefig("Fourierrak/ypf_7k.png")
 
 fig5, plot5=plt.subplots()
@@ -414,25 +465,25 @@ plot5.set_title("Fast Fourier transform of (x,x') phase-space")
 plot5.scatter(2/len(xsp)*np.abs(xfs),2/len(xsp)*np.abs(xpf))
 plt.savefig("Fourierrak/x-espazio_7k.png")
 
-"""fig6, plot6=plt.subplots()
+fig6, plot6=plt.subplots()
 plot6.set_xlabel("fft(y)(2π/mm)")
 plot6.set_ylabel("fft(y')(2π/mm)")
 plot6.set_title("Fast Fourier Transform of (y,y') phase-space")
-plot6.scatter(2/len(ys)*np.abs(yf),2/len(ysp)*np.abs(ypf))
-plt.savefig("Fourierrak/y-espazio_7k.png")"""
+#plot6.scatter(2/len(ys)*np.abs(yf),2/len(ysp)*np.abs(ypf))
+plt.savefig("Fourierrak/y-espazio_7k.png")
 
 fig7, plot7=plt.subplots()
 plot7.set_xlabel("angle(rad)")
 plot7.set_ylabel("fft(xs)(2π/mm)")
 plot7.set_title("Fast Fourier Transform of x")
-plot7.scatter(xfreks,2/len(xs)*np.abs(xfs))
+#plot7.scatter(xfreks,2/len(xs)*np.abs(xfs))
 plt.savefig("Fourierrak/xf_7k_pepper.png")
 
 fig8,plot8=plt.subplots()
 plot8.set_xlabel("angle(rad)")
 plot8.set_ylabel("fft(ym)(2π/mm)")
 plot8.set_title("Fast Fourier Transform of grid y-axis")
-plot8.scatter(yfrekg,2/len(ym)*np.abs(yfg))
+#plot8.scatter(yfrekg,2/len(ym)*np.abs(yfg))
 plt.savefig("Fourierrak/xf_ondo_grid.png")
 
 #Radial distance position and divergence
@@ -440,6 +491,77 @@ rm=np.sqrt(xm**2+ym**2)
 rs=np.sqrt(xs**2+ys**2)
 rsp=np.sqrt(xsp**2+ysp**2)
 
+
+# # Radial(both from measurement and simulated) emittance, FFT and DFT
+
+# In[1035]:
+
+
+def Emi_frec_corr(n,zeroak):
+    emi=np.zeros(n)
+    frek=np.zeros(n)
+    for i in range(n):
+        #Generate meshes
+        theta0,r0=RadialMeshGenerator(Aactualmesh,35,0)
+        theta05,r05=RadialMeshGenerator(Aactualmesh,35,(i+1)*0.001)
+        rex0=np.zeros(len(r0))
+        rex05=np.zeros(len(r05))
+        #Extract theta=0 meridian from meshes
+        for j in range(len(r0)):
+            rex0[j]=r0[j][0]
+        for j in range(len(r05)):
+            rex05[j]=r05[j][0]
+        #Calculate r'
+        rp=np.zeros(len(rex05))
+        for j in range(len(rp)):
+            rp[j]=rex05[j]-rex0[j]
+        #Calculate emittance
+        
+        rsmean=np.mean(rex05)#\overline{r}
+        rspmean=np.mean(rp)#\overline{r'}
+        rs2=np.mean((rex05-rsmean)**2)#\<r^2>
+        rsp2=np.mean((rp-rspmean)**2)#\<r'^2>
+        rex05rp=np.mean((rex05-rsmean)*(rp-rspmean))#\<rr'>
+        emi[i]=np.sqrt(rs2*rsp2-rex05rp**2)
+        #Do DFT of data
+        rpex=np.zeros(len(rp)+zeroak)
+        a=slice(round(zeroak/2),-round(zeroak/2))
+        if(zeroak!=0):
+            rpex[a]=rp
+        else:
+            rpex=rp
+        rpf=DFT(rpex,len(rpex))
+        frek[i]=get_frecuency(np.abs(rpf),np.linspace(0,35,len(rpf)))
+    fig,plot=plt.subplots()
+    plot.set_xlabel("Emittance(mmrad)")
+    plot.set_ylabel("DFT frecuency(2π/mm)")
+    plot.set_title("Emittance and frecuency plotted together")
+    plot.scatter(emi,frek)
+
+#Discrete Fourier Transform inplementation
+def DFT(x,N):
+    xt=np.zeros(N)
+    xf=np.zeros(N)
+    for k in range(N):
+        for i in range(N):
+            xt[i]=x[i]*np.exp(-2*np.pi*1j*k*i/N)
+        xf[k]=sum(xt)
+    return xf
+#Detects frecuency of the plot
+def get_frecuency(xf,ite):
+    erroak=[]
+    dif=0
+    # for local minima
+    minima=argrelextrema(xf,np.less)[0]
+    for inde in minima:
+            erroak.append(ite[inde])
+            for i in range(len(erroak)-1):
+                dif+=erroak[i+1]-erroak[i]
+    return dif/len(erroak)
+
+
+print ("Emittance r rms (mmmrad): ", errms)
+print ("Emittance r rms (π mmmrad): ", errms/np.pi)
 #Radial plot of the Fourier transform
 rfg=fft(rm)
 rfs=fft(rs)
@@ -447,6 +569,20 @@ rpf=fft(rsp)
 rfrekg=fftfreq(len(rm),np.abs(np.max(rm)-np.min(rm))/len(rm))
 rfreks=fftfreq(len(rs),np.abs(np.max(rs)-np.min(rs))/len(rs))
 rspfrek=fftfreq(len(rsp),np.abs(np.max(rsp)-np.min(rsp))/len(rsp))
+zeroak=100
+r0=np.zeros(len(rex0)+zeroak)
+r05=np.zeros(len(rex05)+zeroak)
+if(zeroak!=0):
+    a=slice(round(zeroak/2),-round(zeroak/2))
+    r0[a]=rex0
+else:
+    r0=rex0
+if(zeroak!=0):
+    r05[a]=rex05
+else:
+    r05=rex05
+rf0=DFT(r0,len(r0))
+rf05=DFT(r05,len(r05))
 
 fig9,plot9=plt.subplots()
 plot9.set_xlabel("angle(rad)")
@@ -454,6 +590,7 @@ plot9.set_ylabel("fft(rm)(2π/mm)")
 plot9.set_title("FFT of radial position of grid")
 plot9.scatter(rfrekg,np.abs(rfg))
 plt.savefig("Fourierrak/FFT(rm)")
+print("Mesh position frecuency: ",get_frecuency(np.abs(rfg),rfrekg))
 
 fig,plot10=plt.subplots()
 plot10.set_xlabel("angle(rad)")
@@ -461,6 +598,7 @@ plot10.set_ylabel("fft(rs)(2π/mm)")
 plot10.set_title("FFT of radial position of meausurement")
 plot10.scatter(rfreks,np.abs(rfs))
 plt.savefig("Fourierrak/FFT(rs)")
+print("Measurement position frecuency: ",get_frecuency(np.abs(rfs),rfreks))
 
 fig11,plot11=plt.subplots()
 plot11.set_xlabel("angle(rad)")
@@ -468,11 +606,40 @@ plot11.set_ylabel("fft(rps)(2π/mm)")
 plot11.set_title("FFT of radial divergence of measurement")
 plot11.scatter(rspfrek,np.abs(rpf))
 plt.savefig("Fourierrak/FFT(rsp)")
+print("Measurement divergence frecuency: ",get_frecuency(np.abs(rpf),rspfrek))
+
+fig12,plot12=plt.subplots()
+plot12.set_xlabel("angle(rad)")
+plot12.set_ylabel("DFT(r)(2π/mm)")
+plot12.set_title("DFT of radial mesh position")
+plot12.scatter(np.linspace(0,L,len(rf0)),np.abs(rf0))
+print("Simulated grid position frecuency: ",get_frecuency(np.abs(rf0),np.linspace(0,L,len(rf0))))
+
+fig13,plot13=plt.subplots()
+plot13.set_xlabel("angle(rad)")
+plot13.set_ylabel("DFT(r')(2π/mm)")
+plot13.set_title("DFT of radial mesh divergence")
+plot13.scatter(np.linspace(0,L,len(rf05)),np.abs(rf05))
+print("Simulated grid divergence frecuency",get_frecuency(np.abs(rf05),np.linspace(0,L,len(rf05))))
+
+Emi_frec_corr(50,zeroak)
+
+
+# In[ ]:
+
+
+
 
 
 # # Beam intensities plot
 
-# In[134]:
+# In[ ]:
+
+
+
+
+
+# In[1031]:
 
 
 # Get the X and Y arrays
@@ -481,7 +648,7 @@ Inorm = I/np.max(I) # Nomalized I
 rI = df['RawIntDen'].to_numpy()
 
 
-# In[135]:
+# In[1032]:
 
 
 fig, ax = plt.subplots()
@@ -493,7 +660,7 @@ ax.set_ylabel ("position(mm)")
 plt.savefig ("positions_intensities")
 
 
-# In[136]:
+# In[1033]:
 
 
 fig = plt.figure() # figsize=(13, 7)
@@ -504,7 +671,7 @@ ax.bar3d(xs, ys, I,dx,dy,dz, cmap='plasma')
 
 # ## Another representation to understand the divergence
 
-# In[137]:
+# In[1034]:
 
 
 # Arrowed plot (default scale)

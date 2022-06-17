@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[125]:
+# In[16]:
 
 
 import numpy as np
@@ -11,7 +11,7 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import argrelextrema
 
 
-# In[190]:
+# In[18]:
 
 
 def DFT(x,N):
@@ -82,7 +82,7 @@ MeshSize=35
 
 
 #Generate diverging radial mesh
-theta05,r05=RadialMeshGenerator(pointDis,MeshSize,ratio=0.05)
+theta05,r05=RadialMeshGenerator(pointDis,MeshSize,ratio=0.1)
 #Generate equidistant radial mesh
 theta0,r0=RadialMeshGenerator(pointDis,MeshSize,ratio=0)
 
@@ -91,16 +91,17 @@ theta0,r0=RadialMeshGenerator(pointDis,MeshSize,ratio=0)
 r=np.zeros(len(r05))
 for i in range(len(r05)):
     r[i]=r05[i][0]
-zeroak=50
+zeroak=100
 rexp05=np.zeros(len(r)+zeroak)
 a=slice(int(zeroak/2),-int(zeroak/2))
 rexp05[a]=r
 rf05=fft(rexp05)
-r05frek=fftfreq(len(rf05),0.01)
+r05frek=np.arange(0,len(rf05))
 fig2,ax2=plt.subplots()
 ax2.set_xlabel("angle(rad)")
 ax2.set_ylabel("FFT(r05)(2π/mm)")
 ax2.set_title("Fast Fourier Transform of radially diverging points")
+ax2.scatter(r05frek,np.abs(rf05))
 savefig=("simul_radial_div.png")
 
 
@@ -111,11 +112,12 @@ for i in range(len(r0)):
 rexp0=np.zeros(len(r)+zeroak)
 rexp0[a]=r
 rf0=fft(rexp0)
-r0frek=fftfreq(len(rf0),0.01)
-fig1,ax1=plt.subplots()
+r0frek=np.arange(0,len(rf0))
+fig3,ax3=plt.subplots()
 ax3.set_xlabel("angle(rad)")
 ax3.set_ylabel("FFT(r0)(2π/mm)")
 ax3.set_title("Fast Fourier Transform of radially equidistant points")
+ax3.scatter(r0frek,np.abs(rf0))
 savefig=("simul_radial.png")
 
 # DFT of diverging mesh
@@ -163,6 +165,12 @@ plot3.set_ylabel("DFT(r0)(2π/mm)")
 plot3.set_title("DFT of equidistant mesh")
 plot3.scatter(rfrek0,np.abs(rf0))
 print(get_frecuency(rf0,rfrek0))
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
